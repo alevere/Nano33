@@ -3,16 +3,18 @@
 #include <Arduino_LSM9DS1.h>
 #include <ArduinoBLE.h>
 #define ARM_MATH_CM4
-
-// How to control the RGB Led and Power Led of the Nano 33 BLE boards.  
+// June 2022
+// Code to make a smart, autonomous Droid from Galaxy's Edge bought at Droid Depot
 // This code is for Nano BLE 33 Sense
 // Some code is from https://github.com/arduino/ArduinoAI
+// Some code is from https://forum.arduino.cc/u/gssd/summary
+
 
  #define RED 22     
  #define BLUE 24     
  #define GREEN 23
  #define LED_PWR 25
-const int buttonPin = 4;            // set buttonPin to digital pin 4; 7th from bottom on right side
+const int buttonPin = 4; // set buttonPin to digital pin 4; 7th from bottom on right side
 // default number of output channels
 static const char channels = 1;
 
@@ -65,7 +67,7 @@ void loop() {
   boolean accelFlag = false; 
   float currentAcceleration;
   lightsOn(0);
-  delay(80);
+  delay(50);
   digitalWrite(LED_PWR, HIGH);  
   currentAcceleration = measureAcceleration();
   if (currentAcceleration > 1.5 || currentAcceleration < 0.5) {
@@ -94,18 +96,18 @@ void loop() {
       }
   }
    int i;
-   boolean priorSound;   
+   boolean priorSound = false;   
    int loudnessCount = 0;    
    for (i=0;i<32;i++) {
       priorSound = printByte(spectrum[i]);
-   if(priorSound) {loudnessCount=loudnessCount+1;}  
-   if(loudnessCount>2) loudFlag=true;     
+   if(priorSound) {loudnessCount=loudnessCount+1;}   
    }
-   
+    if(loudnessCount>3) loudFlag=true; 
         //microphoneLevelCharacteristic.writeValue((byte *) &spectrum, 32);
     // Clear the read count
     samplesRead = 0;  
-  //beginSearching();
+  
+  beginSearching();
   //makeNoise(1);
   }
   Serial.println("\n");  
@@ -142,7 +144,7 @@ void makeNoise(int location) {
   // start advertising
   BLE.setAdvertisingInterval(320);
   BLE.advertise();
-  digitalWrite(GREEN, HIGH); // turn the LED on (HIGH is the voltage level)
+  digitalWrite(GREEN, HIGH); // turn the LED off (HIGH is the voltage level)
   digitalWrite(LED_PWR, HIGH);
   delay(250);  
   delay(10000);
@@ -155,27 +157,21 @@ void beginSearching() {
   BLEDevice peripheral = BLE.available();
   bool status = false;
   if (peripheral) {
-     // ...
-  digitalWrite(RED, LOW); // turn the LED on by making the voltage LOW
-  delay(100);        // wait for a 100ms
-  digitalWrite(GREEN, HIGH);
-  delay(100);  
-  digitalWrite(BLUE, LOW);
-  delay(100);   
-  digitalWrite(LED_PWR, HIGH);     
-  delay(2000);
-  digitalWrite(LED_PWR, LOW); 
-  Serial.println(peripheral.localName());
-  Serial.println(peripheral.advertisedServiceUuid());
-  Serial.println(peripheral.characteristicCount());  
+    Serial.println("\n");
+    Serial.println(peripheral.localName());
+    Serial.println(peripheral.advertisedServiceUuid());
+    Serial.println(peripheral.characteristicCount());  
    if (peripheral.localName() == "DROID") {
-      Serial.println("Found an astromech!");
+      Serial.println("!!!!!!!!      Found an astromech    !!!!!!!");
       BLE.stopScan();
-      status = explorePeripheral(peripheral);            
+      lightsOn(3);
+      delay(500);
+      status = explorePeripheral(peripheral);  
+      if (status) Serial.println("Can write to Droid!");              
       }
-   else {BLE.stopScan();}      
+   else {delay(30);}      
   }
-  else { digitalWrite(LED_PWR, LOW); delay(1000);}
+  else { delay(30);}
 }
 
 //connect to bluetooth sensor or peripheral
@@ -183,12 +179,23 @@ bool explorePeripheral(BLEDevice myperipheral){
   if(!myperipheral.connect()) {
     return false;
   }
+Serial.println("Connected to BLE peripheral.\n");  
   if(!myperipheral.discoverAttributes() )
   {
     myperipheral.disconnect();
     return false;
   }  
-    
+  BLECharacteristic droidCharacteristic = myperipheral.characteristic("09b600b1-3e42-41fc-b474-e9c0c8f0c801");
+  if (!droidCharacteristic) {
+    Serial.println("Peripheral does not droid characteristic...");
+    myperipheral.disconnect();
+    return false;
+  } else if (!droidCharacteristic.canWrite()) {
+    Serial.println("Peripheral does not have a writable droid characteristic!");
+    myperipheral.disconnect();
+    return false;
+  }
+return true;
 }
 
 float measureAcceleration() {
@@ -232,7 +239,6 @@ boolean printByte(byte X) {
 }
 
 void lightsOn(int color) {
-  Serial.println("LightsOn...");
   if(color==0){
     //off
     digitalWrite(RED, HIGH); // turn the LED off by making the voltage HIGH
@@ -251,4 +257,10 @@ if(color==2){
     digitalWrite(GREEN, HIGH);
     digitalWrite(BLUE, LOW);
   }    
+  if(color==3){
+    //blue
+    digitalWrite(RED, HIGH); // turn the LED off by making the voltage LOW
+    digitalWrite(GREEN, HIGH);
+    digitalWrite(BLUE, LOW);
+  }  
 }
