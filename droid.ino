@@ -8,7 +8,7 @@
 // This code is for Nano BLE 33 Sense
 // Some code is from https://github.com/arduino/ArduinoAI
 // Some code is from https://forum.arduino.cc/u/gssd/summary
-
+// Using Arduino IDE 2.0.0-rc6
 
  #define RED 22     
  #define BLUE 24     
@@ -106,8 +106,8 @@ void loop() {
         //microphoneLevelCharacteristic.writeValue((byte *) &spectrum, 32);
     // Clear the read count
     samplesRead = 0;  
-  
   beginSearching();
+  
   //makeNoise(1);
   }
   Serial.println("\n");  
@@ -153,7 +153,6 @@ void makeNoise(int location) {
 }
 
 void beginSearching() {
-
   BLEDevice peripheral = BLE.available();
   bool status = false;
   if (peripheral) {
@@ -167,8 +166,7 @@ void beginSearching() {
       lightsOn(3);
       delay(500);
       status = explorePeripheral(peripheral);  
-      if (status) Serial.println("Can write to Droid!");              
-      }
+       }
    else {delay(30);}      
   }
   else { delay(30);}
@@ -176,6 +174,11 @@ void beginSearching() {
 
 //connect to bluetooth sensor or peripheral
 bool explorePeripheral(BLEDevice myperipheral){
+
+  char firstCommand[] = {0x22,0x20,0x01};  
+  char secondCommand[] = {0x27,0x42,0x0f,0x44,0x44,0x00,0x1f,0x00};
+  char thirdCommand[] = {0x27,0x42,0x0f,0x44,0x44,0x00,0x18,0x02}; 
+   
   if(!myperipheral.connect()) {
     return false;
   }
@@ -190,12 +193,32 @@ Serial.println("Connected to BLE peripheral.\n");
     Serial.println("Peripheral does not droid characteristic...");
     myperipheral.disconnect();
     return false;
-  } else if (!droidCharacteristic.canWrite()) {
+  } 
+  if (!droidCharacteristic.canWrite()) {
     Serial.println("Peripheral does not have a writable droid characteristic!");
     myperipheral.disconnect();
     return false;
   }
-return true;
+  Serial.println("Can write to Droid :\)");
+  Serial.println(myperipheral.connected());
+  droidCharacteristic.writeValue(firstCommand,3,true);
+  Serial.println("delay");
+  droidCharacteristic.writeValue(firstCommand,3,true);
+   Serial.println("delay");
+  droidCharacteristic.writeValue(firstCommand),3,true;
+   Serial.println("delay");
+  droidCharacteristic.writeValue(firstCommand),3,true;
+   Serial.println("delay");
+  droidCharacteristic.writeValue(secondCommand,8,true);
+   Serial.println("delay");
+  droidCharacteristic.writeValue(thirdCommand,8,true);
+   Serial.println("delay");
+  droidCharacteristic.writeValue(secondCommand,8,true);
+   Serial.println("delay");
+  droidCharacteristic.writeValue(thirdCommand,8,true);
+  Serial.println("Pairing commands sent, should hear beeps from droid");
+  delay(300);  
+  return true;
 }
 
 float measureAcceleration() {
