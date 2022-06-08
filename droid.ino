@@ -30,7 +30,8 @@ int bytesAvailable;
 volatile int samplesRead;
 volatile bool paired;
 volatile bool droidFlag;
-
+volatile int sampleHuman;
+volatile int humanDelay;
 volatile int loopCount;
 BLEDevice peripheral;  
 BLECharacteristic droidCharacteristic;
@@ -38,6 +39,8 @@ BLECharacteristic notifyCharacteristic;
 
 void setup() {
   droidFlag = false;
+  sampleHuman = 0; //count number of sequential human sounds
+  humanDelay=0; //count delay or pause in speech
   loopCount=0;
  // intitialize the digital Pin as an output
   paired = false; 
@@ -58,6 +61,8 @@ void setup() {
   Serial.print("Accelerometer sample rate = ");
   Serial.print(IMU.accelerationSampleRate());
   Serial.println("Hz");
+  //increase microphone sensitivity  
+  PDM.setGain(0x10);  
   // Configure the data receive callback
   PDM.onReceive(onPDMdata);
   //start blue tooth low energy
@@ -83,7 +88,7 @@ void loop() {
   float currentAcceleration;
   lightsOn(0);
   digitalWrite(LED_PWR, HIGH); //turn LED off 
-
+  int i = 0;
 // assign event handlers for connected, disconnected to peripheral
   BLE.setEventHandler(BLEConnected, blePeripheralConnectHandler);
   BLE.setEventHandler(BLEDisconnected, blePeripheralDisconnectHandler);  
@@ -107,29 +112,58 @@ void loop() {
     arm_rfft_q15(&fft_instance, (q15_t*)sampleBuffer, fftoutput);
 		arm_abs_q15(fftoutput, fftoutput, 256);
 
-		float temp = 0;
+		int temp = 0;
+    int temporary = 0;    
     for (int i = 1; i < 256; i++) {
-      temp = temp + fftoutput[i];
-      if ((i &3) == 2){
-        if (temp>1023) {temp=1023;};
-        spectrum[i>>3] = (byte)(temp/2);
-        temp = 0;
-      }
-  }
-   int i;
-   boolean priorSound = false;   
+      if(i>3 && i<30) {   
+        if((int)fftoutput[i]>9) {temp = temp + 1;} //human frequency heard 
+      Serial.print((int)fftoutput[i]);
+      Serial.print(",");   
+      }       
+    }
+ 
+   if(temp>1&&temp<18){     
+     // possible speech
+     temporary = sampleHuman << 1;
+     sampleHuman = temporary + 1;     
+     }
+   else {
+    //not speech  
+     temporary = sampleHuman << 1;
+     sampleHuman = temporary;             
+     } 
+   Serial.println(sampleHuman);
+   Serial.println("\n");
+    // Look for  11001110 or 11110000001111110
+     // [1]{2,4},[0]{2,6},[1]{3,6},[0]{1}   
+     // 1111010111110000111000     111111111111000000111110    
+   int another=0;
+   int anotherAgain=0;
+   int sampleShifted=0;      
+   another=15 & sampleHuman;
+   if(another==14){
+     for(int i =1; i<16; i++){
+        sampleShifted=sampleHuman >> i;
+        anotherAgain=15 & sampleShifted;
+        if(anotherAgain==14){
+        //probably have two spoken words
+        Serial.println("speech");         
+        loudFlag=true;            
+        }               
+      }        
+    }   
    int loudnessCount = 0;    
-   for (i=0;i<32;i++) {
-      priorSound = printByte(spectrum[i]);
-   if(priorSound) {loudnessCount=loudnessCount+1;}   
-   }
-    if(loudnessCount>3) {
-      loudFlag=true;         
-      }
+   //for (i=0;i<32;i++) {
+   //   priorSound = printByte(spectrum[i]);
+   //if(priorSound) {loudnessCount=loudnessCount+1;}   
+   //}
+   // if(loudnessCount>3) {
+     // loudFlag=true;         
+     // }
         //microphoneLevelCharacteristic.writeValue((byte *) &spectrum, 32);
     // Clear the read count
     samplesRead = 0;  
-  if(loopCount%3==0) {
+  if(true) {
       Serial.println(".");
       if(droidFlag){
         droidCharacteristic = peripheral.characteristic("09b600b1-3e42-41fc-b474-e9c0c8f0c801");
@@ -140,10 +174,15 @@ void loop() {
         } 
         else {
              //we are probably connected to droid
-            if(loudFlag) {makeBeep(0);}                   
+            if(loudFlag) {makeBeep(2);}                   
         }
       }
-      else {beginSearching();}
+      else 
+      {
+         if(loopCount%5==0) {
+           beginSearching();
+         }
+      }
   }
 
   
