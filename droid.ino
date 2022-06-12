@@ -33,9 +33,9 @@ volatile bool droidFlag;
 volatile int sampleHuman;
 volatile int humanDelay;
 volatile int loopCount;
-BLEDevice peripheral;  
-BLECharacteristic droidCharacteristic;
-BLECharacteristic notifyCharacteristic;
+//BLEDevice peripheral;  
+//BLECharacteristic droidCharacteristic;
+//BLECharacteristic notifyCharacteristic;
 
 void setup() {
   droidFlag = false;
@@ -49,7 +49,7 @@ void setup() {
   pinMode(GREEN, OUTPUT);
   pinMode(LED_PWR, OUTPUT);
   lightsOn(1);   
-  delay(1500);
+  delay(5000);
   lightsOn(0);
     // begin initialization
   Serial.begin(9600);    // initialize serial communication
@@ -73,67 +73,212 @@ void setup() {
   // - a 32 kHz or 64 kHz sample rate for the Arduino Portenta Vision Shield
   if (!PDM.begin(channels, frequency)) {
     Serial.println("Failed to start PDM!");
-    while (1);
+    //while (1);
   }  
-  unsigned long previousMillis = 0;        // will store last time LED was updated
+       
   long OnTime = 250;           // milliseconds of on-time
   long OffTime = 750;          // milliseconds of off-time
+// assign event handlers for connected, disconnected to peripheral
+ // BLE.setEventHandler(BLEConnected, blePeripheralConnectHandler);
+ // BLE.setEventHandler(BLEDisconnected, blePeripheralDisconnectHandler);    
 }
 
 // the loop function runs over and over again
 void loop() {
-  loopCount++;
+  //initialize variables
+  BLECharacteristic droidCharacteristic;
+  BLECharacteristic notifyCharacteristic;
+  byte notifyValue;  
   boolean loudFlag = false;  
   boolean accelFlag = false; 
   float currentAcceleration;
+  char firstCommand[] = {0x22,0x20,0x01};  
+  char secondCommand[] = {0x27,0x42,0x0f,0x44,0x44,0x00,0x1f,0x00};
+  char thirdCommand[] = {0x27,0x42,0x0f,0x44,0x44,0x00,0x18,0x02}; 
+  char fourthCommand[] = {0x29,0x42,0x05,0x46,0x01,0x50,0x01,0x2c,0x00,0x00}; //0x46,0x01 is passenger leg
+  char fifthCommand[] = {0x29,0x42,0x05,0x46,0x01,0x00,0x01,0x2c,0x00,0x00};   
+  char sixthCommand[] = {0x29,0x42,0x05,0x46,0x02,0x50,0x01,0x2c,0x00,0x00};
+  char seventhCommand[] = {0x29,0x42,0x05,0x46,0x02,0x00,0x01,0x2c,0x00,0x00};   
+  char eighthCommand[] = {0x29,0x42,0x05,0x46,0x0f,0x50,0x01,0x2c,0x00,0x00};
+  char ninthCommand[] = {0x29,0x42,0x05,0x46,0x0f,0x00,0x01,0x2c,0x00,0x00};   
+  char firstBank[] = {0x27,0x42,0x0f,0x44,0x44,0x00,0x1f,0x00};  
+  char secondBank[] = {0x27,0x42,0x0f,0x44,0x44,0x00,0x1f,0x01}; 
+  char thirdBank[] =  {0x27,0x42,0x0f,0x44,0x44,0x00,0x1f,0x02}; 
+  char firstSound[] = {0x27,0x42,0x0f,0x44,0x44,0x00,0x18,0x00};  
+  char secondSound[] = {0x27,0x42,0x0f,0x44,0x44,0x00,0x18,0x01};     
+  char thirdSound[] = {0x27,0x42,0x0f,0x44,0x44,0x00,0x18,0x02};   
+  char fourthSound[] = {0x27,0x42,0x0f,0x44,0x44,0x00,0x18,0x03};     
+  char fifthSound[] = {0x27,0x42,0x0f,0x44,0x44,0x00,0x18,0x03};  
+  unsigned long currentMillis = 0; 
+  unsigned long previousMillis = 0;  
+  String droidString = "DROID";
+  loopCount++;
+  String myName;
   lightsOn(0);
   digitalWrite(LED_PWR, HIGH); //turn LED off 
   int i = 0;
-// assign event handlers for connected, disconnected to peripheral
-  BLE.setEventHandler(BLEConnected, blePeripheralConnectHandler);
-  BLE.setEventHandler(BLEDisconnected, blePeripheralDisconnectHandler);  
-  BLE.poll(1);
-  
+  int noise = 0;
+  if(loopCount%2==0 && paired==true){
+    if(accelFlag){
+      lightsOn(4);
+      droidCharacteristic.writeValue(thirdBank,8,true);
+      while((currentMillis-30)<previousMillis){currentMillis = millis(); } //loop for 30ms
+      noise=random(5);
+      if(noise==0){droidCharacteristic.writeValue(firstSound,8,true);}  
+      if(noise==1){droidCharacteristic.writeValue(secondSound,8,true);} 
+      if(noise==2){droidCharacteristic.writeValue(thirdSound,8,true);}   
+      if(noise==3){droidCharacteristic.writeValue(fourthSound,8,true);} 
+      if(noise==4){droidCharacteristic.writeValue(fifthSound,8,true);}  
+      while((currentMillis-100)<previousMillis){currentMillis = millis(); } //loop for 100ms    
+      return;
+    }
+    if(loudFlag){
+      lightsOn(4);
+      noise=random(2);
+      if(noise==0){droidCharacteristic.writeValue(firstBank,8,true);}
+      if(noise==1){droidCharacteristic.writeValue(secondBank,8,true);}
+      while((currentMillis-30)<previousMillis){currentMillis = millis(); } //loop for 30ms
+      noise=random(5);
+      if(noise==0){droidCharacteristic.writeValue(firstSound,8,true);}  
+      if(noise==1){droidCharacteristic.writeValue(secondSound,8,true);} 
+      if(noise==2){droidCharacteristic.writeValue(thirdSound,8,true);}   
+      if(noise==3){droidCharacteristic.writeValue(fourthSound,8,true);} 
+      if(noise==4){droidCharacteristic.writeValue(fifthSound,8,true);}  
+      //make droid move
+      if(noise<3){
+        while((currentMillis-30)<previousMillis){currentMillis = millis(); } //loop for 30ms
+        droidCharacteristic.writeValue(fourthCommand,8,true);
+        while((currentMillis-30)<previousMillis){currentMillis = millis(); } //loop for 30ms
+        droidCharacteristic.writeValue(sixthCommand,8,true);
+        while((currentMillis-1000)<previousMillis){currentMillis = millis(); } //loop for 1000ms
+        droidCharacteristic.writeValue(fifthCommand,8,true);
+        while((currentMillis-30)<previousMillis){currentMillis = millis(); } //loop for 30ms
+        droidCharacteristic.writeValue(seventhCommand,8,true);
+      }   
+      else {
+        while((currentMillis-30)<previousMillis){currentMillis = millis(); } //loop for 30ms
+        droidCharacteristic.writeValue(eighthCommand,8,true);
+        while((currentMillis-70)<previousMillis){currentMillis = millis(); } //loop for 70ms
+        droidCharacteristic.writeValue(ninthCommand,8,true);
+      }
+      return;
+    }
+  }
+  if(loopCount%8==0 && paired==false){
+    BLE.scan();
+    BLEDevice peripheral = BLE.available();
+     if (peripheral) {
+    // ...
+
+    Serial.println("Connecting ...");
+    BLE.stopScan(); //must stop scanning before connecting
+    if(peripheral.connect()) {
+      Serial.println("Connected to BLE peripheral.\n");  
+     // print the local name, if present
+     // print the local name, if present
+     if (peripheral.hasLocalName()) {
+       Serial.println(peripheral.localName());
+     //myName=peripheral.localName();
+       if (peripheral.localName().length()==5) {i=0;}
+       else {return;}
+       if(peripheral.discoverAttributes() )
+       {
+        Serial.println("discovered attributes");
+        notifyCharacteristic = peripheral.characteristic("09b600b0-3e42-41fc-b474-e9c0c8f0c801");  
+        droidCharacteristic = peripheral.characteristic("09b600b1-3e42-41fc-b474-e9c0c8f0c801");
+        if (!droidCharacteristic) {
+         Serial.println("Peripheral error at droid characteristic...");
+         peripheral.disconnect();
+         return;
+        }
+       Serial.println("@@ DROID @@");
+       lightsOn(3);   
+       previousMillis = millis(); 
+       currentMillis = millis(); 
+       droidCharacteristic.writeValue(firstCommand,3,true);
+       previousMillis = millis(); 
+       //Serial.println("+");    
+       while((currentMillis-30)<previousMillis){currentMillis = millis(); } //loop for 30ms
+       droidCharacteristic.writeValue(firstCommand,3,true);
+       previousMillis = millis(); 
+       //Serial.println("+");        
+       while((currentMillis-25)<previousMillis){currentMillis = millis(); } 
+       droidCharacteristic.writeValue(firstCommand,3,true);
+       previousMillis = millis(); 
+       //Serial.println(previousMillis);    
+       while((currentMillis-25)<previousMillis){currentMillis = millis(); } //loop for 25ms
+       droidCharacteristic.writeValue(firstCommand,3,true);
+       previousMillis = millis(); 
+       //Serial.println(previousMillis);    
+       while((currentMillis-25)<previousMillis){currentMillis = millis(); } 
+       droidCharacteristic.writeValue(secondCommand,8,true);
+       previousMillis = millis(); 
+       while((currentMillis-25)<previousMillis){currentMillis = millis(); } 
+       droidCharacteristic.writeValue(thirdCommand,8,true);
+       previousMillis = millis(); 
+       while((currentMillis-25)<previousMillis){currentMillis = millis(); } 
+       droidCharacteristic.writeValue(secondCommand,8,true);
+       previousMillis = millis(); 
+       while((currentMillis-25)<previousMillis){currentMillis = millis(); } 
+       droidCharacteristic.writeValue(thirdCommand,8,true);
+       Serial.println("Initialization commands sent, should hear beeps from droid");
+       previousMillis = millis(); 
+       while((currentMillis-200)<previousMillis){currentMillis = millis(); } //loop for 200ms 
+       // assign event handlers for connected, disconnected to peripheral
+       BLE.setEventHandler(BLEConnected, blePeripheralConnectHandler);
+       BLE.setEventHandler(BLEDisconnected, blePeripheralDisconnectHandler);
+       BLE.poll(); 
+       paired = true;
+      }
+      else {peripheral.disconnect(); return;}
+    }
+    else {Serial.println("anonymous BLE device"); BLE.scan(); return;}
+    }
+    else {Serial.println("unable to connect"); BLE.scan(); return;}
+    }
+    BLE.stopScan();
+  }
   currentAcceleration = measureAcceleration();
   if (currentAcceleration > 1.4) {
        Serial.println("stop shaking me");
        Serial.println(currentAcceleration);       
        accelFlag = true;      
   } 
+  
   // Wait for samples to be read
   if (samplesRead) {
-     short micLevel;
-     // arm_rms_q15 (sampleBuffer, samplesRead, &micLevel);
-
-	  static arm_rfft_instance_q15 fft_instance;
-	  static q15_t fftoutput[256*2]; //has to be twice FFT size
-	  static byte spectrum[32];
+	  arm_rfft_instance_q15 fft_instance;
+	  q15_t fftoutput[256*2]; //has to be twice FFT size
     arm_rfft_init_q15(&fft_instance, 256/*bin count*/, 0/*forward FFT*/, 1/*output bit order is normal*/);
     arm_rfft_q15(&fft_instance, (q15_t*)sampleBuffer, fftoutput);
 		arm_abs_q15(fftoutput, fftoutput, 256);
 
 		int temp = 0;
     int temporary = 0;    
+    boolean tooLoud = false;    
     for (int i = 1; i < 256; i++) {
-      if(i>3 && i<30) {   
-        if((int)fftoutput[i]>9) {temp = temp + 1;} //human frequency heard 
-      Serial.print((int)fftoutput[i]);
-      Serial.print(",");   
+      if(i>3 && i<30) {  
+        if((int)fftoutput[i]>280) {tooLoud=true;} //probably the droid itself         
+        if((int)fftoutput[i]>9 && (int)fftoutput[i]<80) {temp = temp + 1;} //human frequency heard 
+      //Serial.print((int)fftoutput[i]);
+      //Serial.print(",");   
       }       
     }
  
    if(temp>1&&temp<18){     
      // possible speech
      temporary = sampleHuman << 1;
-     sampleHuman = temporary + 1;     
-     }
+     if(tooLoud==false) {sampleHuman = temporary + 1;  }
+     else        
+      {sampleHuman=temporary;}
+      }
    else {
     //not speech  
      temporary = sampleHuman << 1;
      sampleHuman = temporary;             
      } 
-   Serial.println(sampleHuman);
-   Serial.println("\n");
+   //Serial.println(sampleHuman);
+   //Serial.println("\n");
     // Look for  11001110 or 11110000001111110
      // [1]{2,4},[0]{2,6},[1]{3,6},[0]{1}   
      // 1111010111110000111000     111111111111000000111110    
@@ -163,39 +308,7 @@ void loop() {
         //microphoneLevelCharacteristic.writeValue((byte *) &spectrum, 32);
     // Clear the read count
     samplesRead = 0;  
-  if(true) {
-      Serial.println(".");
-      if(droidFlag){
-        droidCharacteristic = peripheral.characteristic("09b600b1-3e42-41fc-b474-e9c0c8f0c801");
-        if (!droidCharacteristic) {
-          Serial.println("No droid characteristic...");
-          peripheral.disconnect();
-          droidFlag = false;          
-        } 
-        else {
-             //we are probably connected to droid
-            if(loudFlag) {makeBeep(2);}                   
-        }
-      }
-      else 
-      {
-         if(loopCount%5==0) {
-           beginSearching();
-         }
-      }
   }
-
-  
-  //makeNoise(1);
-  } 
-  if (loudFlag){
-    lightsOn(2);
-    //makeNoise(1);
-  } 
-  if (accelFlag){
-    lightsOn(2);
-    //makeNoise(2);
-  } 
 }
 
 void startBLE() {
@@ -221,6 +334,7 @@ void blePeripheralDisconnectHandler(BLEDevice central) {
   // central disconnected event handler
   Serial.print("Disconnected event, central: ");
   Serial.println(central.address());
+  paired = false;
 }
 
 void makeNoise(int location) {
@@ -240,123 +354,6 @@ void makeNoise(int location) {
   delay(10000);
   BLE.stopAdvertise();
   digitalWrite(LED_PWR, LOW);
-}
-
-void beginSearching() {
-  BLE.scan();
-  peripheral = BLE.available();
-  bool status = false;
-  if (peripheral) {
-    Serial.println("\n");
-    Serial.println(peripheral.localName());
-    Serial.println(peripheral.advertisedServiceUuid());
-    Serial.println(peripheral.characteristicCount());  
-   if (peripheral.localName() == "DROID") {       
-      BLE.stopScan();
-      Serial.println("!!!!!!!!      Found an astromech    !!!!!!!");
-      droidFlag = true;
-      lightsOn(3);
-      droidFlag = connectPeripheral();
-       }
-   else {Serial.println('wrongperiph');}      
-  }
-  else { Serial.println('noperiph'); }
-}
-
-//connect to bluetooth sensor or peripheral
-bool connectPeripheral(){
-  byte notifyValue;
-  char firstCommand[] = {0x22,0x20,0x01};  
-  char secondCommand[] = {0x27,0x42,0x0f,0x44,0x44,0x00,0x1f,0x00};
-  char thirdCommand[] = {0x27,0x42,0x0f,0x44,0x44,0x00,0x18,0x02}; 
-  char fourthCommand[] = {0x29,0x42,0x05,0x46,0x03,0x50,0x01,0x2c,0x00,0x00}; //0x01 is passenger leg, 0x02 head
-  char fifthCommand[] = {0x29,0x42,0x05,0x46,0x03,0x00,0x01,0x2c,0x00,0x00};   
-  unsigned long currentMillis = millis();   
-  if(!peripheral.connect()) {
-    return false;
-  }
-  Serial.println("Connected to BLE peripheral.\n");  
-  if(!peripheral.discoverAttributes() )
-  {
-    peripheral.disconnect();
-    Serial.println("no discovered attr");
-    return false;
-  }  
-  notifyCharacteristic = peripheral.characteristic("09b600b0-3e42-41fc-b474-e9c0c8f0c801");  
-  droidCharacteristic = peripheral.characteristic("09b600b1-3e42-41fc-b474-e9c0c8f0c801");
-  if (!droidCharacteristic) {
-    Serial.println("Peripheral error at droid characteristic...");
-    peripheral.disconnect();
-    return false;
-  } 
-  if (!droidCharacteristic.canWrite()) {
-    Serial.println("Peripheral does not have a writable droid characteristic!");
-    peripheral.disconnect();
-    return false;
-  }
-  Serial.println("Can write to Droid :\)");
-  droidCharacteristic.writeValue(firstCommand,3,true);
-  currentMillis = millis(); 
-  droidCharacteristic.writeValue(firstCommand,3,true);
-  currentMillis = millis(); 
-  droidCharacteristic.writeValue(firstCommand),3,true;
-  currentMillis = millis(); 
-  droidCharacteristic.writeValue(firstCommand),3,true;
-  currentMillis = millis(); 
-  droidCharacteristic.writeValue(secondCommand,8,true);
-  currentMillis = millis(); 
-  droidCharacteristic.writeValue(thirdCommand,8,true);
-  currentMillis = millis(); 
-  droidCharacteristic.writeValue(secondCommand,8,true);
-  currentMillis = millis(); 
-  droidCharacteristic.writeValue(thirdCommand,8,true);
-  Serial.println("Initialization commands sent, should hear beeps from droid");
-  paired = true;
-  delay(250);
-  notifyCharacteristic.readValue(notifyValue);  
-  Serial.println(notifyValue);
-  droidCharacteristic.writeValue(fourthCommand,10,true);
-  delay(1000);
-  droidCharacteristic.writeValue(fifthCommand,10,true);       
-  return true;
-}
-
-//have droid make a noise
-bool makeBeep(int noise){
-
-  char firstBank[] = {0x27,0x42,0x0f,0x44,0x44,0x00,0x1f,0x00};  
-  char secondBank[] = {0x27,0x42,0x0f,0x44,0x44,0x00,0x1f,0x01};  
-  char firstSound[] = {0x27,0x42,0x0f,0x44,0x44,0x00,0x18,0x00};  
-  char secondSound[] = {0x27,0x42,0x0f,0x44,0x44,0x00,0x18,0x01};     
-  char thirdSound[] = {0x27,0x42,0x0f,0x44,0x44,0x00,0x18,0x02};   
-  char fourthSound[] = {0x27,0x42,0x0f,0x44,0x44,0x00,0x18,0x03};     
-  if(!peripheral.connect()) {
-    return false;
-  }
-  Serial.println("Connected to BLE peripheral.\n");  
-  if(!peripheral.discoverAttributes() )
-  {
-    peripheral.disconnect();
-    Serial.println("no discovered attr");
-    return false;
-  }  
-  droidCharacteristic = peripheral.characteristic("09b600b1-3e42-41fc-b474-e9c0c8f0c801");
-  if (!droidCharacteristic) {
-    Serial.println("Peripheral does not droid characteristic...");
-    peripheral.disconnect();
-    return false;
-  } 
-  if (!droidCharacteristic.canWrite()) {
-    Serial.println("Peripheral does not have a writable droid characteristic!");
-    peripheral.disconnect();
-    return false;
-  }
-  droidCharacteristic.writeValue(firstBank,8,true);
-  delay(30);
-  if(noise==0){droidCharacteristic.writeValue(firstSound,8,true);}  
-  if(noise==1){droidCharacteristic.writeValue(secondSound,8,true);} 
-  if(noise==2){droidCharacteristic.writeValue(thirdSound,8,true);}   
-  return true;
 }
 
 float measureAcceleration() {
@@ -397,7 +394,7 @@ void onPDMdata() {
 
 boolean printByte(byte X) {  
   if (X > 6) {
-    Serial.print(X, HEX);    
+    //Serial.print(X, HEX);    
     return true;   //heard a loud sound for 250ms    
   }    
   else return false;
@@ -429,5 +426,11 @@ if(color==2){
     digitalWrite(RED, HIGH); // turn the LED off by making the voltage LOW
     digitalWrite(GREEN, HIGH);
     digitalWrite(BLUE, LOW);
+  }  
+    if(color==4){
+    //red
+    digitalWrite(RED, LOW); // turn the LED off by making the voltage LOW
+    digitalWrite(GREEN, HIGH);
+    digitalWrite(BLUE, HIGH);
   }  
 }
