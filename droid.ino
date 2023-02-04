@@ -22,7 +22,7 @@
  * with slices per model window set to 4. Results in a slice size of 250 ms.
  * For more info: https://docs.edgeimpulse.com/docs/continuous-audio-sampling
  */
-#define EI_CLASSIFIER_SLICES_PER_MODEL_WINDOW 4
+#define EI_CLASSIFIER_SLICES_PER_MODEL_WINDOW 2
 
 /*
  ** NOTE: If you run into TFLite arena allocation issue.
@@ -42,12 +42,13 @@
 /* Includes ---------------------------------------------------------------- */
 #include <PDM.h>
 #include <DroiDepotSpeech_inferencing.h>
-#include <Arduino_APDS9960.h>
+//#include <Arduino_APDS9960.h>
 //dont use with impulse edge
 //#include <arm_math.h>
-#include <Arduino_LSM9DS1.h>
+//#include <Arduino_LSM9DS1.h>
+//install arduinoble v.1.3.2
 #include <ArduinoBLE.h>
-#define ARM_MATH_CM4
+//#define ARM_MATH_CM4
 
 // Feb 2023
 // Code to make a smarter and somewhat autonomous Droid from Galaxy's Edge brought from the Droid Depot
@@ -200,14 +201,14 @@ void loop()
         notifyCharacteristic = peripheral.characteristic("09b600b0-3e42-41fc-b474-e9c0c8f0c801");  
         droidCharacteristic = peripheral.characteristic("09b600b1-3e42-41fc-b474-e9c0c8f0c801");
         if (!droidCharacteristic) {
-         Serial.println("Peripheral error at droid characteristic...");
+         //Serial.println("Peripheral error at droid characteristic...");
          peripheral.disconnect();
          return;
         }
        // assign event handlers for connected, disconnected to peripheral
        //BLE.setEventHandler(BLEConnected, blePeripheralConnectHandler);
        //BLE.setEventHandler(BLEDisconnected, blePeripheralDisconnectHandler);        
-       Serial.println("@@ DROID @@");
+       //Serial.println("@@ DROID @@");
        lightsOn(3);   
        previousMillis = millis(); 
        currentMillis = millis(); 
@@ -250,7 +251,7 @@ void loop()
     else {Serial.println("anonymous BLE device"); return;}
     }
   }
-    
+  else {
     bool m = microphone_inference_record();
     if (!m) {
         ei_printf("ERR: Failed to record audio...\n");
@@ -267,50 +268,60 @@ void loop()
         ei_printf("ERR: Failed to run classifier (%d)\n", r);
         return;
     }
-
+    lightsOn(0); //turn light off
     if (++print_results >= (EI_CLASSIFIER_SLICES_PER_MODEL_WINDOW)) {
         // print the predictions
         //ei_printf("Predictions ");
         //ei_printf("(DSP: %d ms., Classification: %d ms., Anomaly: %d ms.)",result.timing.dsp, result.timing.classification, result.timing.anomaly);
         //ei_printf(": \n");
         for (size_t ix = 0; ix < EI_CLASSIFIER_LABEL_COUNT; ix++) {
-           // ei_printf("    %s: %.5f\n", result.classification[ix].label,result.classification[ix].value);
+            //ei_printf("    %s: %.5f\n", result.classification[ix].label,result.classification[ix].value);
         }
+        // 0 = backward, 1=dance,2=forward,3=go,4=noise,5=right,6=silence,7=six,8=stop,9=turn,10=two
 #if EI_CLASSIFIER_HAS_ANOMALY == 1
         //ei_printf("    anomaly score: %.3f\n", result.anomaly);
 #endif
 //if connected to BLE and forward heard make a noise
           //just noise
           rand = random(5);
-          if (result.classification[6].value>0.44||result.classification[9].value>0.44) {
+          if (result.classification[4].value>0.44||result.classification[6].value>0.44) {
             //makeNoise(0,0,droidCharacteristic);     
             //ei_printf("make noise..."); 
             //droidCharacteristic.writeValue(sixthCommand,6,true);  
-            //if(paired) {moveForward(); }  
-            lightsOn(3);                      
+            //if(paired) {moveForward(); }                       
           }   
-          else if (result.classification[0].value>0.25||result.classification[13].value>0.7) {
-            if(paired) {makeNoise(2,rand); }              
+          else if (result.classification[10].value>0.6) {
+            if(paired) {makeNoise(0,rand); }              
           }    
-          else if (result.classification[1].value>0.5) {
+          else if (result.classification[0].value>0.5) {
             if(paired) {moveBackward(); }              
           }    
-          else if (result.classification[3].value>0.6||result.classification[4].value>0.7) {
+          else if (result.classification[2].value>0.6) {
             if(paired) {moveForward(); }              
           }    
-          else if (result.classification[12].value>0.35) {
+          else if (result.classification[9].value>0.4||result.classification[5].value>0.5) {
             if(paired) {moveRotate(0); }              
           }      
-          else if (result.classification[5].value>0.6) {
+          else if (result.classification[7].value>0.6) {
             if(paired) {makeNoise(2,5); }              
           }   
-          else if (result.classification[10].value>0.7) {
-            if(paired) {moveHead(); }              
+          else if (result.classification[1].value>0.2) {
+            if(paired) {
+              makeNoise(2,2);
+              moveHead(); 
+              makeNoise(2,3);
+              moveRotate(0);
+              makeNoise(2,4);      
+              moveHead();
+              moveRotate(1);  
+              makeNoise(2,5);                                              
+              }              
           }     
           else {lightsOn(4);}              
         print_results = 0;
     }
-}
+  } //end else
+} //end loop
 
 /**
  * @brief      PDM buffer full callback
@@ -345,6 +356,7 @@ static void pdm_data_ready_inference_callback(void)
  */
 static bool microphone_inference_start(uint32_t n_samples)
 {
+    lightsOn(3); // turn light blue if mic is listening
     inference.buffers[0] = (signed short *)malloc(n_samples * sizeof(signed short));
 
     if (inference.buffers[0] == NULL) {
@@ -511,7 +523,8 @@ void makeNoise(int bank, int slot) {
     if(slot==1){droidCharacteristic.writeValue(secondSound,8,true);}  
     if(slot==2){droidCharacteristic.writeValue(thirdSound,8,true);}  
     if(slot==3){droidCharacteristic.writeValue(fourthSound,8,true);}  
-    else {droidCharacteristic.writeValue(fifthSound,8,true);} 
+    if(slot==4){droidCharacteristic.writeValue(fifthSound,8,true);}     
+    else {droidCharacteristic.writeValue(sixthSound,8,true);} 
     while((currentMillis-500)<previousMillis){currentMillis = millis(); } //loop for 500ms       
           }
 
