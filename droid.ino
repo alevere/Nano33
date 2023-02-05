@@ -82,15 +82,15 @@ volatile int loopCount;
 static char firstCommand[] = {0x22,0x20,0x01};  
 static char secondCommand[] = {0x27,0x42,0x0f,0x44,0x44,0x00,0x1f,0x00};
 static char thirdCommand[] = {0x27,0x42,0x0f,0x44,0x44,0x00,0x18,0x02}; 
-static char fourthCommand[] = {0x29,0x42,0x05,0x46,0x00,0x80,0x01,0x2c,0x00,0x00}; //0first motor forwards half power
+static char fourthCommand[] = {0x29,0x42,0x05,0x46,0x00,0x70,0x01,0x2c,0x00,0x00}; //0first motor forwards half power
 static char fifthCommand[] = {0x29,0x42,0x05,0x46,0x00,0x00,0x01,0x2c,0x00,0x00};  //stop motor  
 static char sixthCommand[] = {0x25,0x00,0x0c,0x42,0x08,0x02}; //rotate head
-static char seventhCommand[] = {0x29,0x42,0x05,0x46,0x01,0x80,0x01,0x2c,0x00,0x00}; //second motor 0x46,0x01 is passenger leg
+static char seventhCommand[] = {0x29,0x42,0x05,0x46,0x01,0x70,0x01,0x2c,0x00,0x00}; //second motor 0x46,0x01 is passenger leg
 static char eighthCommand[] = {0x29,0x42,0x05,0x46,0x01,0x00,0x01,0x2c,0x00,0x00}; //stop motor
 static char ninthCommand[] = {0x29,0x42,0x05,0x46,0x80,0x90,0x01,0x2c,0x00,0x00}; 
 static char tenthCommand[] = {0x29,0x42,0x05,0x46,0x81,0x90,0x01,0x2c,0x00,0x00}; 
-static char eleventhCommand[] = {0x29,0x42,0x05,0x46,0x80,0x80,0x01,0x2c,0x00,0x00}; //0first motor backwards half power
-static char twelthCommand[] = {0x29,0x42,0x05,0x46,0x81,0x80,0x01,0x2c,0x00,0x00}; //second motor backwards half power
+static char eleventhCommand[] = {0x29,0x42,0x05,0x46,0x80,0x70,0x01,0x2c,0x00,0x00}; //0first motor backwards half power
+static char twelthCommand[] = {0x29,0x42,0x05,0x46,0x81,0x70,0x01,0x2c,0x00,0x00}; //second motor backwards half power
 
 static char firstBank[] = {0x27,0x42,0x0f,0x44,0x44,0x00,0x1f,0x00};  
 static char secondBank[] = {0x27,0x42,0x0f,0x44,0x44,0x00,0x1f,0x01}; 
@@ -159,10 +159,10 @@ void loop()
     digitalWrite(LED_PWR, HIGH); //turn LED off 
     int i = 0;
     int rand = 0;
-  if(loopCount%40==0) {
-      if(peripheral.connected()==false){
-        paired==false;
-        startBLE(); 
+  if(loopCount%50==0) {
+    if(peripheral.rssi()>0){
+        paired=false;
+        BLE.scan();
       }
     }
   if(!paired){
@@ -173,7 +173,6 @@ void loop()
     // ...
 
     //Serial.println("Connecting ...");
-     
      // print the local name, if present
      // print the local name, if present
      if (peripheral.hasLocalName()) {
@@ -188,8 +187,7 @@ void loop()
        if(peripheral.connect()) {
          //Serial.println("Connected to BLE peripheral.\n");   
        } 
-       else {
-         startBLE();         
+       else {        
          return;
        }   
        previousMillis = millis(); 
@@ -252,6 +250,7 @@ void loop()
     }
   }
   else {
+    lightsOn(3);
     bool m = microphone_inference_record();
     if (!m) {
         ei_printf("ERR: Failed to record audio...\n");
@@ -291,7 +290,7 @@ void loop()
             //if(paired) {moveForward(); }                       
           }   
           else if (result.classification[10].value>0.6) {
-            if(paired) {makeNoise(0,rand); }              
+            if(paired) {makeNoise(3,0); }              
           }    
           else if (result.classification[0].value>0.5) {
             if(paired) {moveBackward(); }              
@@ -311,9 +310,9 @@ void loop()
               moveHead(); 
               makeNoise(2,3);
               moveRotate(0);
+              moveRotate(0);
               makeNoise(2,4);      
-              moveHead();
-              moveRotate(1);  
+              moveForward();  
               makeNoise(2,5);                                              
               }              
           }     
@@ -356,7 +355,6 @@ static void pdm_data_ready_inference_callback(void)
  */
 static bool microphone_inference_start(uint32_t n_samples)
 {
-    lightsOn(3); // turn light blue if mic is listening
     inference.buffers[0] = (signed short *)malloc(n_samples * sizeof(signed short));
 
     if (inference.buffers[0] == NULL) {
@@ -525,7 +523,7 @@ void makeNoise(int bank, int slot) {
     if(slot==3){droidCharacteristic.writeValue(fourthSound,8,true);}  
     if(slot==4){droidCharacteristic.writeValue(fifthSound,8,true);}     
     else {droidCharacteristic.writeValue(sixthSound,8,true);} 
-    while((currentMillis-500)<previousMillis){currentMillis = millis(); } //loop for 500ms       
+    while((currentMillis-400)<previousMillis){currentMillis = millis(); } //loop for 500ms       
           }
 
 // function to play a sound from the sound bank based on two parameters passed in
@@ -537,10 +535,10 @@ void moveForward() {
     previousMillis=millis();    
     droidCharacteristic.writeValue(fourthCommand,10,true);
     droidCharacteristic.writeValue(seventhCommand,10,true);
-    while((currentMillis-1500)<previousMillis){currentMillis = millis(); } //loop for 30ms
+    while((currentMillis-1100)<previousMillis){currentMillis = millis(); } //loop for 30ms
     droidCharacteristic.writeValue(fifthCommand,10,true);  
     droidCharacteristic.writeValue(eighthCommand,10,true); 
-    while((currentMillis-500)<previousMillis){currentMillis = millis(); } //loop for 500ms       
+    while((currentMillis-400)<previousMillis){currentMillis = millis(); } //loop for 500ms       
           }
           
    void moveBackward() {
@@ -551,10 +549,10 @@ void moveForward() {
     previousMillis=millis();    
     droidCharacteristic.writeValue(eleventhCommand,10,true);
     droidCharacteristic.writeValue(twelthCommand,10,true);
-    while((currentMillis-1000)<previousMillis){currentMillis = millis(); } //loop for 30ms
+    while((currentMillis-900)<previousMillis){currentMillis = millis(); } //loop for 30ms
     droidCharacteristic.writeValue(fifthCommand,10,true);  
     droidCharacteristic.writeValue(eighthCommand,10,true); 
-    while((currentMillis-500)<previousMillis){currentMillis = millis(); } //loop for 500ms       
+    while((currentMillis-400)<previousMillis){currentMillis = millis(); } //loop for 500ms       
           }    
 
 
@@ -569,7 +567,7 @@ void moveForward() {
     while((currentMillis-300)<previousMillis){currentMillis = millis(); } //loop for 30ms
     droidCharacteristic.writeValue(fifthCommand,10,true);  
     droidCharacteristic.writeValue(eighthCommand,10,true); 
-    while((currentMillis-500)<previousMillis){currentMillis = millis(); } //loop for 500ms       
+    while((currentMillis-400)<previousMillis){currentMillis = millis(); } //loop for 500ms       
           }     
 
   void moveHead() {
@@ -579,7 +577,7 @@ void moveForward() {
     currentMillis=millis();
     previousMillis=millis();    
     droidCharacteristic.writeValue(sixthCommand,6,true); 
-    while((currentMillis-800)<previousMillis){currentMillis = millis(); } //loop for 500ms       
+    while((currentMillis-400)<previousMillis){currentMillis = millis(); } //loop for 500ms       
           }  
                    
 #if !defined(EI_CLASSIFIER_SENSOR) || EI_CLASSIFIER_SENSOR != EI_CLASSIFIER_SENSOR_MICROPHONE
